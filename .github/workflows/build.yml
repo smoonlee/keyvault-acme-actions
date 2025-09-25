@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  DOTNET_VERSION: 8.0.x
+  BICEP_VERSION: 0.37.4
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        submodules: true
+
+    - name: Use .NET ${{ env.DOTNET_VERSION }}
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Use Bicep ${{ env.BICEP_VERSION }}
+      run: |
+        az config set bicep.use_binary_from_path=false
+        az bicep install --version v${{ env.BICEP_VERSION }}
+
+    - name: Build project
+      run: dotnet build -c Release
+
+    - name: Lint C# code
+      run: dotnet format --verify-no-changes --exclude ACMESharpCore --verbosity detailed --no-restore
+
+    - name: Lint Bicep template
+      run: az bicep build -f azuredeploy.bicep && git diff --exit-code --quiet
